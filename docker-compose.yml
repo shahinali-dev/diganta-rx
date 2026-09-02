@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: diganta_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: diganta
+      POSTGRES_PASSWORD: diganta123
+      POSTGRES_DB: diganta_rx
+    ports:
+      - "5433:5432"
+    volumes:
+      - diganta_pgdata:/var/lib/postgresql/data
+
+volumes:
+  diganta_pgdata:
