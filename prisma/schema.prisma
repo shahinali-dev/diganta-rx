@@ -1,0 +1,331 @@
+// Diganta Rx - Prisma schema
+// Mirrors the MVP scope from the Diganta Rx feature roadmap:
+// HCP Master, Territory & Beat Planning, Visit/DCR, Sample Management,
+// e-Detailing, Target/KPI, Expense & Claims.
+// Extend this file module by module as you build out each backend module.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Core / Auth
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  MANAGER
+  REP
+}
+
+enum Provider {
+  LOCAL
+  GOOGLE
+  FACEBOOK
+}
+
+
+
+model User {
+  id             String    @id @default(uuid())
+  name           String
+  email          String    @unique
+  password       String?
+  provider       Provider  @default(LOCAL)
+  role           Role      @default(REP)
+  avatar         String?
+  isVerified     Boolean   @default(false)
+
+  otp                    String?
+  otpExpiry              DateTime?
+  otpAttempts            Int       @default(0)
+  otpBlockedUntil        DateTime?
+  lastOtpSentAt          DateTime?
+
+  passwordResetOtp             String?
+  passwordResetOtpExpiry       DateTime?
+  passwordResetAttempts        Int       @default(0)
+  passwordResetBlockedUntil    DateTime?
+  lastPasswordResetOtpSentAt   DateTime?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  territories    Territory[]      @relation("TerritoryRep")
+  visits         Visit[]
+  claims         Claim[]
+  approvals      VisitApproval[]  @relation("ApprovedBy")
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// 1. HCP (Healthcare Professional) Master Data
+// ---------------------------------------------------------------------------
+
+enum DoctorTier {
+  A
+  B
+  C
+}
+
+model Doctor {
+  id          String     @id @default(uuid())
+  name        String
+  qualification String?
+  specialty   String?
+  phone       String?
+  email       String?
+  tier        DoctorTier @default(C)
+  bmdcNumber  String?    @unique // Bangladesh Medical & Dental Council reg. no.
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  locations   DoctorLocation[]
+  visits      Visit[]
+  samplesGiven SampleDistribution[]
+
+  @@map("doctors")
+}
+
+model Chamber {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+
+  doctors   DoctorLocation[]
+  visits    Visit[]
+
+  @@map("chambers")
+}
+
+// Pivot: a doctor linked to multiple chambers, each with its own visiting hours
+model DoctorLocation {
+  id            String   @id @default(uuid())
+  doctorId      String
+  chamberId     String
+  visitingHours Json? // e.g. { "sat": "6-9pm", "mon": "6-9pm" }
+
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  chamber Chamber @relation(fields: [chamberId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, chamberId])
+  @@map("doctor_locations")
+}
+
+// ---------------------------------------------------------------------------
+// 2. Territory & Beat Planning
+// ---------------------------------------------------------------------------
+
+model Territory {
+  id        String   @id @default(uuid())
+  name      String
+  parentId  String? // self-relation for HQ -> Region -> Branch hierarchy
+  repId     String?
+  geofenceRadius Float? // in meters
+  createdAt DateTime @default(now())
+
+  parent    Territory?  @relation("TerritoryHierarchy", fields: [parentId], references: [id])
+  children  Territory[] @relation("TerritoryHierarchy")
+  rep       User?       @relation("TerritoryRep", fields: [repId], references: [id])
+  callPlans CallPlan[]
+
+  @@map("territories")
+}
+
+model CallPlan {
+  id          String   @id @default(uuid())
+  territoryId String
+  repId       String
+  doctorId    String
+  plannedDate DateTime
+  createdAt   DateTime @default(now())
+
+  territory Territory @relation(fields: [territoryId], references: [id])
+
+  @@map("call_plans")
+}
+
+// ---------------------------------------------------------------------------
+// 3. Visit & Daily Call Report (DCR)
+// ---------------------------------------------------------------------------
+
+enum VisitType {
+  SCHEDULED
+  UNSCHEDULED
+  EMERGENCY
+  FOLLOW_UP
+}
+
+model Visit {
+  id          String    @id @default(uuid())
+  repId       String
+  doctorId    String
+  chamberId   String
+  type        VisitType @default(SCHEDULED)
+  checkInAt   DateTime?
+  checkInLat  Float?
+  checkInLng  Float?
+  checkOutAt  DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  rep       User            @relation(fields: [repId], references: [id])
+  doctor    Doctor          @relation(fields: [doctorId], references: [id])
+  chamber   Chamber         @relation(fields: [chamberId], references: [id])
+  approval  VisitApproval?
+  samples   SampleDistribution[]
+  contentSessions ContentSession[]
+
+  @@map("visits")
+}
+
+model VisitApproval {
+  id         String   @id @default(uuid())
+  visitId    String   @unique
+  approvedById String?
+  approved   Boolean  @default(false)
+  remarks    String?
+  createdAt  DateTime @default(now())
+
+  visit      Visit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  approvedBy User? @relation("ApprovedBy", fields: [approvedById], references: [id])
+
+  @@map("visit_approvals")
+}
+
+// ---------------------------------------------------------------------------
+// 4. Sample & Promotional Material Management (highest-priority MVP gap)
+// ---------------------------------------------------------------------------
+
+model SampleSku {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  batchNumber String?
+  expiryDate  DateTime?
+  createdAt   DateTime @default(now())
+
+  allocations   SampleAllocation[]
+  distributions SampleDistribution[]
+
+  @@map("sample_skus")
+}
+
+enum AllocationLevel {
+  HQ
+  TERRITORY
+  REP
+}
+
+// HQ -> territory -> rep allocation ledger
+model SampleAllocation {
+  id          String          @id @default(uuid())
+  skuId       String
+  level       AllocationLevel
+  territoryId String?
+  repId       String?
+  quantity    Int
+  createdAt   DateTime        @default(now())
+
+  sku SampleSku @relation(fields: [skuId], references: [id])
+
+  @@map("sample_allocations")
+}
+
+// Rep -> doctor distribution, linked to a visit for audit trail
+model SampleDistribution {
+  id        String   @id @default(uuid())
+  skuId     String
+  doctorId  String
+  visitId   String?
+  repId     String
+  quantity  Int
+  createdAt DateTime @default(now())
+
+  sku    SampleSku @relation(fields: [skuId], references: [id])
+  doctor Doctor    @relation(fields: [doctorId], references: [id])
+  visit  Visit?    @relation(fields: [visitId], references: [id])
+
+  @@map("sample_distributions")
+}
+
+// ---------------------------------------------------------------------------
+// 5. e-Detailing / Digital CLM
+// ---------------------------------------------------------------------------
+
+model ContentItem {
+  id        String   @id @default(uuid())
+  title     String
+  fileUrl   String
+  version   Int      @default(1)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  sessions ContentSession[]
+
+  @@map("content_items")
+}
+
+model ContentSession {
+  id           String   @id @default(uuid())
+  contentId    String
+  visitId      String
+  durationSecs Int?
+  pagesViewed  Int?
+  createdAt    DateTime @default(now())
+
+  content ContentItem @relation(fields: [contentId], references: [id])
+  visit   Visit       @relation(fields: [visitId], references: [id])
+
+  @@map("content_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// 6. Target & KPI Management
+// ---------------------------------------------------------------------------
+
+model Target {
+  id           String   @id @default(uuid())
+  repId        String?
+  territoryId  String?
+  periodStart  DateTime
+  periodEnd    DateTime
+  callTarget   Int?
+  sampleBudget Int?
+  createdAt    DateTime @default(now())
+
+  @@map("targets")
+}
+
+// ---------------------------------------------------------------------------
+// 10. Expense & Claims
+// ---------------------------------------------------------------------------
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Claim {
+  id          String      @id @default(uuid())
+  repId       String
+  category    String
+  amount      Float
+  receiptUrl  String?
+  status      ClaimStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+
+  rep User @relation(fields: [repId], references: [id])
+
+  @@map("claims")
+}
