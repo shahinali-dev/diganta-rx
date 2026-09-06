@@ -2,6 +2,7 @@ import { Router } from "express";
 import httpStatus from "http-status";
 import { isAdmin } from "../../middleware/is_admin";
 import { isAuth } from "../../middleware/is_auth";
+import { attachFileUrl, imageUpload } from "../../middleware/upload.middleware";
 import validateRequest from "../../middleware/validate_request.middleware";
 import catchAsync from "../../utils/catch_async.utils";
 import sendResponse from "../../utils/send_response.utils";
@@ -50,7 +51,8 @@ router.get(
     sendResponse(res, {
       success: IResponseStatus.SUCCESS,
       statusCode: httpStatus.OK,
-      meta,
+      message: "Users fetched successfully",
+      meta: meta as unknown as Record<string, unknown>,
       data: result,
     });
   }),
@@ -87,6 +89,32 @@ router.get(
     sendResponse(res, {
       success: IResponseStatus.SUCCESS,
       statusCode: httpStatus.OK,
+      message: "User info fetched successfully",
+      data: user,
+    });
+  }),
+);
+
+router.patch(
+  "/update-info",
+  isAuth,
+  imageUpload.single("avatar"),
+  attachFileUrl,
+  validateRequest(userValidation.updateUserInfoValidationSchema),
+  catchAsync(async (req, res) => {
+    const userId = req.user?.id as string;
+    const data = req.body;
+
+    if (req.file) {
+      data.avatar = req.file.url;
+    }
+
+    const user = await userService.updateUserInfo(userId, data);
+
+    sendResponse(res, {
+      success: IResponseStatus.SUCCESS,
+      statusCode: httpStatus.OK,
+      message: "User info updated successfully",
       data: user,
     });
   }),

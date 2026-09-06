@@ -5,8 +5,9 @@ import prisma from "../../lib/prisma";
 import createToken from "../../utils/create_token";
 import { OTPUtils } from "../../utils/otp_utils";
 import passwordUtils from "../../utils/password_utils";
+import QueryBuilder from "../../utils/query_builder";
 import { EmailService } from "../email/email.service";
-import { OTP_CONFIG } from "./user.enum";
+import { OTP_CONFIG, Role } from "./user.enum";
 import { IUser } from "./user.interface";
 
 export const userSelectWithoutPassword = {
@@ -201,6 +202,24 @@ export class UserService {
         lastPasswordResetOtpSentAt: true,
       },
     });
+  }
+
+  async updateUserInfo(userId: string, data: Record<string, unknown>) {
+    const { password, role, id, email, isVerified, ...safeData } = data;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      throw new AppError(httpStatus.NOT_FOUND, "User not found");
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: safeData,
+      select: userSelectWithoutPassword,
+    });
+
+    return updatedUser;
   }
 }
 

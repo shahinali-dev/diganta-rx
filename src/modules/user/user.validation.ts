@@ -30,9 +30,22 @@ const resetPasswordValidationSchema = z.object({
   newPassword: z.string().min(6, "Password must be at least 6 characters"),
 });
 
+const migrateRoleValidationSchema = z.object({
+  role: z.nativeEnum(Role, {
+    errorMap: () => ({ message: "Invalid role value" }),
+  }),
+});
+
+const updateUserInfoValidationSchema = z.object({
+  name: z.string().min(1, "Name Must be at least 1 character").optional(),
+  avatar: z.string().optional(),
+});
+
 export const userValidation = {
   baseUserValidationSchema,
   verifyOtpValidationSchema,
   forgotPasswordValidationSchema,
   resetPasswordValidationSchema,
+  migrateRoleValidationSchema,
+  updateUserInfoValidationSchema,
 };
