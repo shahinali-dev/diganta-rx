@@ -5,6 +5,7 @@ type TSendResponse<T> = {
   success: IResponseStatus;
   statusCode: number;
   message: string;
+  meta?: Record<string, unknown>;
   data: T;
 };
 
@@ -13,6 +14,7 @@ const sendResponse = <T>(res: Response, data: TSendResponse<T>) => {
     success: data.success,
     statusCode: data.statusCode,
     message: data.message,
+    meta: data.meta,
     data: data.data,
   });
 };
