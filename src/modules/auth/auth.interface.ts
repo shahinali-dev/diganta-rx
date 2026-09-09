@@ -1,7 +1,7 @@
 import { Role } from "@prisma/client";
 
 interface IJWTPayload {
-  id: string;
+  uuid: string;
   email: string;
   role?: Role;
 }

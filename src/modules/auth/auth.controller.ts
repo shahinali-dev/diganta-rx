@@ -94,8 +94,8 @@ router.get(
   "/user-info",
   isAuth,
   catchAsync(async (req, res) => {
-    const userId = req.user!.id;
-    const user = await authService.getAuthUser(userId);
+    const userUuid = req.user!.uuid;
+    const user = await authService.getAuthUser(userUuid);
     res.status(httpStatus.OK).json({
       success: IResponseStatus.SUCCESS,
       statusCode: httpStatus.OK,
@@ -110,8 +110,8 @@ router.post(
   isVerify,
   catchAsync(async (req: any, res: any) => {
     const { otp } = req.body;
-    const { email, id } = req.user;
-    const userId = id as string;
+    const { email, uuid } = req.user;
+    const userUuid = uuid as string;
 
     if (!otp) {
       throw new AppError(httpStatus.BAD_REQUEST, "OTP is required");
@@ -124,7 +124,7 @@ router.post(
       );
     }
 
-    const result = await authService.verifyOTP(userId, email, otp);
+    const result = await authService.verifyOTP(userUuid, email, otp);
 
     return sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -139,9 +139,9 @@ router.post(
   "/resend-otp",
   isVerify,
   catchAsync(async (req: any, res: any) => {
-    const { email, id: userId } = req.user;
+    const { email, uuid: userUuid } = req.user;
 
-    const result = await authService.resendOTP(userId, email);
+    const result = await authService.resendOTP(userUuid, email);
 
     return sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -177,7 +177,7 @@ router.post(
       ) as unknown as IJWTPayload;
 
       const jwtPayload: IJWTPayload = {
-        id: decoded?.id,
+        uuid: decoded?.uuid,
         email: decoded?.email,
         role: decoded?.role,
       };

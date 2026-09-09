@@ -59,15 +59,15 @@ router.get(
 );
 
 router.patch(
-  "/migrate/:id",
+  "/migrate/:uuid",
   isAuth,
   isAdmin,
   validateRequest(userValidation.migrateRoleValidationSchema),
   catchAsync(async (req, res) => {
-    const { id } = req.params;
+    const { uuid } = req.params;
     const { role } = req.body;
 
-    const user = await userService.migrateUserRoles(id, role);
+    const user = await userService.migrateUserRoles(uuid, role);
 
     sendResponse(res, {
       success: IResponseStatus.SUCCESS,
@@ -79,12 +79,12 @@ router.patch(
 );
 
 router.get(
-  "/:id",
+  "/:uuid",
   isAuth,
   isAdmin,
   catchAsync(async (req, res) => {
-    const { id } = req.params;
-    const user = await userService.getUserById(id);
+    const { uuid } = req.params;
+    const user = await userService.getUserById(uuid);
 
     sendResponse(res, {
       success: IResponseStatus.SUCCESS,
@@ -102,14 +102,14 @@ router.patch(
   attachFileUrl,
   validateRequest(userValidation.updateUserInfoValidationSchema),
   catchAsync(async (req, res) => {
-    const userId = req.user?.id as string;
+    const userUuid = req.user?.uuid as string;
     const data = req.body;
 
     if (req.file) {
       data.avatar = req.file.url;
     }
 
-    const user = await userService.updateUserInfo(userId, data);
+    const user = await userService.updateUserInfo(userUuid, data);
 
     sendResponse(res, {
       success: IResponseStatus.SUCCESS,
