@@ -10,8 +10,10 @@ import { EmailService } from "../email/email.service";
 import { OTP_CONFIG, Role } from "./user.enum";
 import { IUser } from "./user.interface";
 
+// NOTE: internal "id" is intentionally excluded here - "uuid" is the only
+// identifier that should ever be sent to the frontend.
 export const userSelectWithoutPassword = {
-  id: true,
+  uuid: true,
   name: true,
   email: true,
   role: true,
@@ -48,7 +50,7 @@ export class UserService {
         const hashedPassword = await passwordUtils.hash(password);
 
         const updatedUser = await prisma.user.update({
-          where: { id: existingUser.id },
+          where: { uuid: existingUser.uuid },
           data: {
             otp: hashedOTP,
             otpExpiry,
@@ -60,7 +62,7 @@ export class UserService {
         });
 
         const jwtPayload = {
-          id: updatedUser.id,
+          uuid: updatedUser.uuid,
           email: updatedUser.email,
         };
 
@@ -110,7 +112,7 @@ export class UserService {
     });
 
     const jwtPayload = {
-      id: newUser.id,
+      uuid: newUser.uuid,
       email: newUser.email,
     };
 
@@ -142,15 +144,15 @@ export class UserService {
     return { meta, result };
   }
 
-  async migrateUserRoles(id: string, role: Role) {
-    const user = await prisma.user.findUnique({ where: { id } });
+  async migrateUserRoles(uuid: string, role: Role) {
+    const user = await prisma.user.findUnique({ where: { uuid } });
 
     if (!user) {
       throw new AppError(httpStatus.NOT_FOUND, "User not found");
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id },
+      where: { uuid },
       data: { role },
       select: userSelectWithoutPassword,
     });
@@ -158,9 +160,9 @@ export class UserService {
     return updatedUser;
   }
 
-  async getUserById(id: string) {
+  async getUserById(uuid: string) {
     const user = await prisma.user.findUnique({
-      where: { id },
+      where: { uuid },
       select: userSelectWithoutPassword,
     });
 
@@ -171,11 +173,14 @@ export class UserService {
     return user;
   }
 
-  async getUserForOtpVerification(id: string) {
+  // Internal-only lookups (OTP / password-reset flows). These never get
+  // serialized straight to a client response, so "id" is fine to omit
+  // entirely - every lookup and update below is keyed on "uuid".
+  async getUserForOtpVerification(uuid: string) {
     return await prisma.user.findUnique({
-      where: { id },
+      where: { uuid },
       select: {
-        id: true,
+        uuid: true,
         name: true,
         email: true,
         isVerified: true,
@@ -188,11 +193,11 @@ export class UserService {
     });
   }
 
-  async getUserForPasswordReset(id: string) {
+  async getUserForPasswordReset(uuid: string) {
     return await prisma.user.findUnique({
-      where: { id },
+      where: { uuid },
       select: {
-        id: true,
+        uuid: true,
         name: true,
         email: true,
         passwordResetOtp: true,
@@ -204,17 +209,19 @@ export class UserService {
     });
   }
 
-  async updateUserInfo(userId: string, data: Record<string, unknown>) {
-    const { password, role, id, email, isVerified, ...safeData } = data;
+  async updateUserInfo(uuid: string, data: Record<string, unknown>) {
+    // Strip both identifiers (and other locked fields) so a client can never
+    // overwrite them through this endpoint.
+    const { password, role, id, uuid: bodyUuid, email, isVerified, ...safeData } = data;
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prisma.user.findUnique({ where: { uuid } });
 
     if (!user) {
       throw new AppError(httpStatus.NOT_FOUND, "User not found");
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { uuid },
       data: safeData,
       select: userSelectWithoutPassword,
     });
