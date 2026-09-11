@@ -31,7 +31,13 @@ export class UserService {
   }
 
   async registerUser(userData: IUser) {
-    const { password, ...user } = userData;
+    // role deliberately discarded here: self-registration must always fall
+    // through to the schema default (ORG_ADMIN). Letting a client set its
+    // own role on a public signup endpoint would be a privilege-escalation
+    // hole (e.g. registering directly as ADMIN). Roles beyond the default
+    // are only ever assigned via userService.migrateUserRoles, which is
+    // gated behind isAuth + isAdmin.
+    const { password, role, ...user } = userData;
 
     if (!password) {
       throw new AppError(httpStatus.BAD_REQUEST, "Password is required");
