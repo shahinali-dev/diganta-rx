@@ -18,7 +18,8 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 enum Role {
-  ADMIN
+  ADMIN      
+  ORG_ADMIN 
   MANAGER
   REP
 }
@@ -28,8 +29,6 @@ enum Provider {
   GOOGLE
   FACEBOOK
 }
-
-
 
 model User {
   id             String    @id @default(uuid()) 
@@ -41,6 +40,9 @@ model User {
   role           Role      @default(REP)
   avatar         String?
   isVerified     Boolean   @default(false)
+
+  organizationId String?       @map("organization_id")
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   otp                    String?
   otpExpiry              DateTime?
@@ -64,6 +66,69 @@ model User {
 
   @@map("users")
 }
+
+// ---------------------------------------------------------------------------
+// Multi-tenant: Organization & Industry Taxonomy
+// ---------------------------------------------------------------------------
+
+enum CompanySize {
+  SIZE_1_10
+  SIZE_11_50
+  SIZE_51_200
+  SIZE_201_500
+  SIZE_500_PLUS
+}
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  logo        String?
+  companySize CompanySize? @map("company_size")
+
+  industryId  String?      @map("industry_id")
+  industry    Industry?    @relation(fields: [industryId], references: [id])
+
+  defaultCurrency String @default("BDT") @map("default_currency")
+  fiscalYearStart  Int    @default(7)    @map("fiscal_year_start") // 1-12 = calendar month
+  primaryTimezone  String @default("Asia/Dhaka") @map("primary_timezone")
+
+  users       User[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([industryId])
+  @@map("organizations")
+}
+
+model Industry {
+  id           String   @id @default(uuid())
+  name         String
+  code         String   @unique
+  description  String?
+
+  icon         String?
+  color        String?
+  isFeatured   Boolean  @default(false) @map("is_featured")
+  displayOrder Int      @default(0) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
+
+  parentId     String?    @map("parent_id")
+  parent       Industry?  @relation("IndustryHierarchy", fields: [parentId], references: [id])
+  children     Industry[] @relation("IndustryHierarchy")
+
+  organizations Organization[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([displayOrder])
+  @@index([isActive])
+  @@map("industries")
+}
+
+
 
 // ---------------------------------------------------------------------------
 // 1. HCP (Healthcare Professional) Master Data
