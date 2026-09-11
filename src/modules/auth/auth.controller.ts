@@ -180,6 +180,7 @@ router.post(
         id: decoded?.id,
         email: decoded?.email,
         role: decoded?.role,
+        organizationId: decoded?.organizationId,
       };
 
       const newAccessToken = createToken(

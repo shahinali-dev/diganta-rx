@@ -79,6 +79,7 @@ export class AuthService {
       id: rest.id,
       email: rest.email,
       role: rest.role,
+      organizationId: rest.organizationId,
     };
 
     const accessToken = createToken(
