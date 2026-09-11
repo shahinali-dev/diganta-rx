@@ -45,7 +45,7 @@ export class AuthService {
       const hashedOTP = OTPUtils.hashOTP(otp);
 
       await prisma.user.update({
-        where: { uuid: existingUser.uuid },
+        where: { id: existingUser.id },
         data: {
           otp: hashedOTP,
           otpExpiry: new Date(Date.now() + OTP_CONFIG.EXPIRY_DURATION),
@@ -55,7 +55,7 @@ export class AuthService {
       });
 
       const verifyToken = createToken(
-        { uuid: existingUser.uuid, email: existingUser.email },
+        { id: existingUser.id, email: existingUser.email },
         config.JWT_VERIFY_SECRET,
         config.JWT_VERIFY_EXPIRE_IN,
       );
@@ -73,14 +73,12 @@ export class AuthService {
       };
     }
 
-    // Strip both password and the internal id - "safeUser" (with its
-    // "uuid" field) is what actually goes back to the client.
-    const { password, id, ...safeUser } = existingUser;
+    const { password, ...rest } = existingUser;
 
     const jwtPayload = {
-      uuid: safeUser.uuid,
-      email: safeUser.email,
-      role: safeUser.role,
+      id: rest.id,
+      email: rest.email,
+      role: rest.role,
     };
 
     const accessToken = createToken(
@@ -97,18 +95,18 @@ export class AuthService {
 
     return {
       requiresVerification: false as const,
-      user: safeUser,
+      user: rest,
       accessToken,
       refreshToken,
     };
   }
 
-  async getAuthUser(uuid: string) {
-    return await userService.getUserById(uuid);
+  async getAuthUser(id: string) {
+    return await userService.getUserById(id);
   }
 
-  async verifyOTP(uuid: string, email: string, inputOtp: string) {
-    const user = await userService.getUserForOtpVerification(uuid);
+  async verifyOTP(userId: string, email: string, inputOtp: string) {
+    const user = await userService.getUserForOtpVerification(userId);
 
     if (!user) {
       throw new AppError(
@@ -167,7 +165,7 @@ export class AuthService {
 
       if (newAttempts >= OTP_CONFIG.MAX_ATTEMPTS) {
         await prisma.user.update({
-          where: { uuid: user.uuid },
+          where: { id: user.id },
           data: {
             otpAttempts: newAttempts,
             otpBlockedUntil: new Date(Date.now() + OTP_CONFIG.BLOCK_DURATION),
@@ -183,7 +181,7 @@ export class AuthService {
       }
 
       await prisma.user.update({
-        where: { uuid: user.uuid },
+        where: { id: user.id },
         data: { otpAttempts: newAttempts },
       });
 
@@ -198,7 +196,7 @@ export class AuthService {
 
     // OTP thik - verify kore sob OTP data clear
     const verifiedUser = await prisma.user.update({
-      where: { uuid: user.uuid },
+      where: { id: user.id },
       data: {
         isVerified: true,
         otp: null,
@@ -217,8 +215,8 @@ export class AuthService {
     };
   }
 
-  async resendOTP(uuid: string, email: string) {
-    const user = await userService.getUserForOtpVerification(uuid);
+  async resendOTP(userId: string, email: string) {
+    const user = await userService.getUserForOtpVerification(userId);
 
     if (!user) {
       throw new AppError(httpStatus.BAD_REQUEST, "Invalid request");
@@ -261,7 +259,7 @@ export class AuthService {
     const otpExpiry = new Date(Date.now() + OTP_CONFIG.EXPIRY_DURATION);
 
     await prisma.user.update({
-      where: { uuid: user.uuid },
+      where: { id: user.id },
       data: {
         otp: hashedOTP,
         otpExpiry,
@@ -315,7 +313,7 @@ export class AuthService {
     const otpExpiry = new Date(Date.now() + OTP_CONFIG.EXPIRY_DURATION);
 
     await prisma.user.update({
-      where: { uuid: user.uuid },
+      where: { id: user.id },
       data: {
         passwordResetOtp: hashedOTP,
         passwordResetOtpExpiry: otpExpiry,
@@ -339,7 +337,7 @@ export class AuthService {
       throw new AppError(httpStatus.BAD_REQUEST, "Invalid reset request");
     }
 
-    const userWithOTP = await userService.getUserForPasswordReset(user.uuid);
+    const userWithOTP = await userService.getUserForPasswordReset(user.id);
     if (!userWithOTP) {
       throw new AppError(httpStatus.BAD_REQUEST, "Invalid reset request");
     }
@@ -375,7 +373,7 @@ export class AuthService {
 
       if (newAttempts >= OTP_CONFIG.MAX_ATTEMPTS) {
         await prisma.user.update({
-          where: { uuid: userWithOTP.uuid },
+          where: { id: userWithOTP.id },
           data: {
             passwordResetAttempts: newAttempts,
             passwordResetBlockedUntil: new Date(
@@ -393,7 +391,7 @@ export class AuthService {
       }
 
       await prisma.user.update({
-        where: { uuid: userWithOTP.uuid },
+        where: { id: userWithOTP.id },
         data: { passwordResetAttempts: newAttempts },
       });
 
@@ -410,7 +408,7 @@ export class AuthService {
     const hashedPassword = await passwordUtils.hash(newPassword);
 
     const updatedUser = await prisma.user.update({
-      where: { uuid: userWithOTP.uuid },
+      where: { id: userWithOTP.id },
       data: {
         password: hashedPassword,
         passwordResetOtp: null,
