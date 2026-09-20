@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authRoute } from "../modules/auth/auth.controller";
+import { organizationRoute } from "../modules/organization/organization.controller";
 import { userRoute } from "../modules/user/user.controller";
 
 const router = Router();
@@ -12,6 +13,10 @@ const moduleRoutes = [
   {
     path: "/api/v1/user",
     route: userRoute,
+  },
+  {
+    path: "/api/v1/organization",
+    route: organizationRoute,
   },
 
   // Add new Diganta Rx modules here as you build them, e.g.:

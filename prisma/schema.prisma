@@ -36,7 +36,7 @@ model User {
   email          String    @unique
   password       String?
   provider       Provider  @default(LOCAL)
-  role           Role      @default(REP)
+  role           Role      @default(ORG_ADMIN)
   avatar         String?
   isVerified     Boolean   @default(false)
 
